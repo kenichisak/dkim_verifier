@@ -80,6 +80,7 @@ var dbInitialized = false;
 var dbInitializedDefer = Promise.defer();
 
 var favicons;
+var rulesUpdatedObservers = [];
 
 var Policy = {
 	get version() { "use strict"; return module_version; },
@@ -543,6 +544,55 @@ var Policy = {
 			log.fatal(exceptionToStr(exception));
 		});
 		return promise;
+	},
+
+	/**
+	 * Adds a function, which is called if sign rules changed.
+	 * The handler function is called with the number of added rules
+	 * (negative if rules where removed) as an argument.
+	 * 
+	 * @param {Function} handler
+	 */
+	addRulesUpdatedObserver: function Policy_addRulesUpdatedListener(handler) {
+		"use strict";
+
+		log.debug("addRulesUpdatedObserver begin: " + rulesUpdatedObservers.length);
+		rulesUpdatedObservers.push(handler);
+		log.debug("addRulesUpdatedObserver end:" + rulesUpdatedObservers.length);
+	},
+
+	/**
+	 * Removes the sign rules changed observer.
+	 */
+	removeRulesUpdatedObserver: function Policy_addRulesUpdatedListener(handler) {
+		"use strict";
+
+		log.debug("removeRulesUpdatedObserver begin: " + rulesUpdatedObservers.length);
+        rulesUpdatedObservers = rulesUpdatedObservers.filter(function(item) {
+			if (item !== handler) {
+				return item;
+			}
+		});
+		log.debug("removeRulesUpdatedObserver end: " + rulesUpdatedObservers.length);
+	},
+
+	/**
+	 * Notify the sign rules changed observer.
+	 * 
+	 * @param {Number} count Number of rules added
+	 */
+	rulesUpdated: function Policy_rulesUpdated(count) {
+		"use strict";
+
+		log.debug("rulesUpdated: " + count);
+        rulesUpdatedObservers.forEach(function(observer) {
+			if (observer) {
+				observer(count);
+			} else {
+				log.error("observer undefined/null");
+			}
+        });
+		log.debug("rulesUpdated: end");
 	},
 };
 

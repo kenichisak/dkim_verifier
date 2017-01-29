@@ -3,7 +3,7 @@
  * 
  * Implements a nsITreeView for a SQLite DB table.
  *
- * Version: 1.0.0 (21 November 2013)
+ * Version: 1.1.0 (17 December 2016)
  * 
  * Copyright (c) 2013 Philippe Lieser
  * 
@@ -34,7 +34,6 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://dkim_verifier/ModuleGetter.jsm");
 ModuleGetter.getosfile(this);
 
-
 /**
  * SQLiteTreeView
  * Implements nsITreeView and some additional methods.
@@ -46,8 +45,12 @@ ModuleGetter.getosfile(this);
  * @param {String} dbPath The database file to open. This can be an absolute or relative path. If a relative path is given, it is interpreted as relative to the current profile's directory.
  * @param {String} tableName Table to be displayed
  * @param {String[]} columns Columns to be displayed in the same order as in the tree
+ * @param {Object} observable Observable
+ *     subscribe: subscribe handler, that takes number of added rows as argument 
+ *     unsubscribe: 
+ *     notify(count): notify all observers of changes
  */
-function SQLiteTreeView(dbPath, tableName, columns) {
+function SQLiteTreeView(dbPath, tableName, columns, observable) {
 	"use strict";
 
 	// Retains absolute paths and normalizes relative as relative to profile.
@@ -65,6 +68,8 @@ function SQLiteTreeView(dbPath, tableName, columns) {
 	});
 	this.columnClause = this.columns.join(", ");
 	this.insertParamsClause = ":"+this.columns.join(", :");
+	
+	this.observable = observable;
 }
 SQLiteTreeView.prototype = {
 	/*
@@ -147,10 +152,40 @@ SQLiteTreeView.prototype = {
 		}
 		return rowids;
 	},
+
+	/**
+	 * If observable is set, notify it.
+	 * Otherwise, directly update the tree view
+	 * 
+	 * @param {Number} [rowCountChanged] Number of rows changed
+	 */
+	_triggerUpdate: function SQLiteTreeView__triggerUpdate(rowCountChanged) {
+		"use strict";
+
+		if (this.observable) {
+			this.observable.notify(rowCountChanged);
+		} else {
+			this.update(rowCountChanged);
+		}
+	},
 	
 	/*
 	 * SQLiteTreeView methods
 	 */
+
+	/**
+	 * Update the tree view
+	 * 
+	 * @param {Number} [rowCountChanged] Number of rows changed
+	 */
+	update: function SQLiteTreeView_update(rowCountChanged) {
+		"use strict";
+
+		if (rowCountChanged) {
+			this.treebox.rowCountChanged(0, rowCountChanged);
+		}
+		this.treebox.invalidate();
+	},
 
 	/**
 	 * Adds a new row to the database
@@ -168,8 +203,7 @@ SQLiteTreeView.prototype = {
 		);
 		
 		// update tree
-		this.treebox.rowCountChanged(0, 1);
-		this.treebox.invalidate();
+		this._triggerUpdate(1);
 	},
 	
 	/**
@@ -203,8 +237,7 @@ SQLiteTreeView.prototype = {
 			);
 		}
 		// update tree
-		this.treebox.rowCountChanged(0, -rowids.length);
-		this.treebox.invalidate();
+		this._triggerUpdate(-rowids.length);
 	},
 	
 	/*
@@ -245,8 +278,7 @@ SQLiteTreeView.prototype = {
 		}
 		
 		this._updateOrderClause();
-		this.treebox.invalidate();
-		// this.cacheRowNum = -1; // Invalidate cache		
+		this._triggerUpdate();
 	},
 	
 	getCellProperties: function SQLiteTreeView_getCellProperties(/*row,col,props*/) {},
@@ -333,11 +365,22 @@ SQLiteTreeView.prototype = {
 				this.sortOrder.push({"index":i, "orderDirection ": 0});
 			}
 			this._updateOrderClause();
+
+			if (this.observable) {
+				var self = this;
+				this.updateHandler = function(x) {self.update.call(self, x)};
+				this.observable.subscribe(this.updateHandler);
+			}
 		} else {
 			if (this.conn && this.connectionReady) {
 				// close connection
 				this.conn.close();
 				// this.conn = null;
+	
+				if (this.observable) {
+					this.observable.unsubscribe(this.updateHandler);
+					this.observable = null;
+				}
 			}
 		}
 	},
