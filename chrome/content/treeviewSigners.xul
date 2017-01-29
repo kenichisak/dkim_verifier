@@ -3,9 +3,17 @@
 
 <!DOCTYPE overlay SYSTEM "chrome://dkim_verifier/locale/xulstrings.dtd">
 
-<window title="&treeviewSigners.title;" id="tree-window"
-   xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-   onload="setView();">
+<window
+	xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+	id="dkim_verifier-treeviewSigners"
+	windowtype="dkim_verifier:treeviewSigners"
+	title="&treeviewSigners.title;"
+	drawtitle="true"
+	height="300"
+	width="600"
+	persist="width height screenX screenY sizemode"
+	onload="setView();"
+	onunload=";">
 
 <script type="text/javascript">
 Components.utils.import("resource://gre/modules/Task.jsm");
